@@ -1,4 +1,5 @@
 import {createEmailRegistration,emailReady} from './email-otp.mjs';
+import {createPasswordReset} from './password-reset.mjs';
 import http from 'node:http';
 import {randomBytes,createHash} from 'node:crypto';
 import {createReadStream,createWriteStream,statSync,existsSync,unlinkSync,openSync,readSync,closeSync} from 'node:fs';
@@ -7,6 +8,7 @@ import {pipeline} from 'node:stream/promises';
 import {Transform} from 'node:stream';
 import {db,get,all,run,dataDir,userId,hashPassword,checkPassword,settings} from './db.mjs';
 const emailRegistration=createEmailRegistration();
+const passwordReset=createPasswordReset();
 const port=Number(process.env.PORT||8080), origin=process.env.PUBLIC_ORIGIN||`http://localhost:${port}`;
 const secure=process.env.COOKIE_SECURE==='true';
 const pub=resolve('public'), media=resolve(dataDir,'media');
@@ -57,6 +59,19 @@ if(p==='/api/register/verify'&&req.method==='POST'){
  res.setHeader('Set-Cookie',`lumi_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${secure?'; Secure':''}`);
  return json(res,{ok:true});
 }
+if(p==='/api/password-reset'&&req.method==='POST'){
+ rate(req.socket.remoteAddress+':password-reset',20);
+ return json(res,await passwordReset.start(await body(req)),202);
+}
+if(p==='/api/password-reset/resend'&&req.method==='POST'){
+ rate(req.socket.remoteAddress+':password-reset-resend',20);
+ return json(res,await passwordReset.resend(await body(req)));
+}
+if(p==='/api/password-reset/verify'&&req.method==='POST'){
+ rate(req.socket.remoteAddress+':password-reset-verify',30);
+ return json(res,await passwordReset.verify(await body(req)));
+}
+
 if(p==='/api/login'&&req.method==='POST'){
  rate(req.socket.remoteAddress+':auth');const b=await body(req),identifier=text(b.username,254),password=b.password;
  if(!identifier||typeof password!=='string'||password.length<8||password.length>128)fail('Имэйл/нэр болон нууц үгээ оруулна уу.');
@@ -76,7 +91,7 @@ if(p.startsWith('/media/')&&['GET','HEAD'].includes(req.method)){const a=get("SE
 if(p.startsWith('/api/admin')){
  admin(u);
  if(p==='/api/admin/upload'&&req.method==='POST')return await upload(req,res,u);
- if(p==='/api/admin/data'&&req.method==='GET')return json(res,{movies:all('SELECT * FROM movies ORDER BY created DESC'),orders:all('SELECT o.*,u.username,m.title FROM orders o JOIN users u ON o.user_id=u.id JOIN movies m ON o.movie_id=m.id ORDER BY o.created DESC'),users:all('SELECT id,username,role,created FROM users ORDER BY created DESC'),settings:settings()});
+ if(p==='/api/admin/data'&&req.method==='GET')return json(res,{movies:all('SELECT * FROM movies ORDER BY created DESC'),orders:all('SELECT o.*,u.username,m.title FROM orders o JOIN users u ON o.user_id=u.id JOIN movies m ON o.movie_id=m.id ORDER BY o.created DESC'),users:all('SELECT id,username,email,role,created FROM users ORDER BY created DESC'),settings:settings()});
  if(p==='/api/admin/settings'&&req.method==='PUT'){const b=await body(req);transaction(()=>{for(const key of ['brand','bank','account','holder','contact'])run('INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',key,text(b[key],150));log(u,'settings','site');});return json(res,{ok:true});}
  if(p==='/api/admin/movies'&&req.method==='POST'){
  const b=await body(req),id=text(b.id)||uid();const title=text(b.title,120),description=text(b.description,4000),category=text(b.category),price=Number(b.price),year=Number(b.year),duration=text(b.duration,40),poster=text(b.poster)||null,video=text(b.video)||null;

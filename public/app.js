@@ -3,7 +3,7 @@ const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>'
 const money=n=>Number(n).toLocaleString('en-US')+'₮';
 const state={user:null,settings:{},movies:[],orders:[],category:'Бүгд',query:'',adminTab:'orders'};
 const categories=['Бүгд','Орчин үеийн','Түүхэн','Романтик','Триллер'];
-const samples=[['Сарны гэрэлд','Романтик'],['Чимээгүй хот','Триллер'],['Хааны амлалт','Түүхэн'],['Дахин учрах өдөр','Орчин үеийн'],['Зүрхний зүг','Романтик']].map(([title,category],i)=>({id:'demo'+i,title,category,price:0,year:2026,duration:'Жишээ загвар',demo:true,description:'Энэ бол дизайны жишээ. Админ хэсгээс өөрийн кино, постер, үнэ болон видеогоо оруулснаар жинхэнэ кино сан харагдана.'}));
+const samples=[];
 async function api(path,method='GET',data){const r=await fetch(path,{method,headers:{'X-Lumi-Request':'1',...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined});let b;try{b=await r.json();}catch{throw Error('Сүлжээний алдаа. Дахин оролдоно уу.');}if(!r.ok)throw Error(b.error||'Алдаа гарлаа.');return b;}
 function toast(s){$('#toast').textContent=s;$('#toast').classList.add('visible');setTimeout(()=>$('#toast').classList.remove('visible'),4000);}
 async function refresh(){const [session,movies]=await Promise.all([api('/api/session'),api('/api/movies')]);Object.assign(state,session,{movies});$('#brand').textContent=state.settings.brand||'lumi.';document.title=(state.settings.brand||'Lumi')+' · Киноны ертөнц';$('#account').textContent=state.user?state.user.username:'Нэвтрэх';}
@@ -17,8 +17,9 @@ $('#close-modal').onclick=()=>$('#modal').close();
 $('#modal').addEventListener('click',e=>{if(e.target===$('#modal'))$('#modal').close();});
 $('#account').onclick=()=>state.user?location.hash='account':auth();
 function auth(register=false){
- modal(`<span class="eyebrow">LUMI CINEMA</span><h2>${register?'Тавтай морил':'Дахин уулзсандаа таатай байна'}</h2><p class="muted">${register?'Имэйлээ баталгаажуулаад өөрийн кино сантай болоорой.':'Киноны ертөнцдөө нэвтрээрэй.'}</p><form id="auth-form">${register?'<label for="email">Имэйл хаяг</label><input id="email" name="email" type="email" autocomplete="email" maxlength="254" required placeholder="name@gmail.com">':''}<label for="username">${register?'Хэрэглэгчийн нэр':'Имэйл эсвэл хэрэглэгчийн нэр'}</label><input id="username" name="username" autocomplete="username" ${register?'pattern="[a-zA-Z0-9_]{3,30}" minlength="3" maxlength="30"':'maxlength="254"'} required placeholder="${register?'Латин үсэг, тоо, _':'Имэйл эсвэл нэр'}"><label for="password">Нууц үг</label><input id="password" name="password" type="password" minlength="8" maxlength="128" autocomplete="${register?'new-password':'current-password'}" required placeholder="8-аас дээш тэмдэгт"><p class="error" id="auth-error" role="alert"></p><button class="button full">${register?'Баталгаажуулах код авах':'Нэвтрэх'}</button></form><div class="auth-switch"><button class="text-button" id="auth-switch">${register?'Бүртгэлтэй юу? Нэвтрэх':'Шинэ хэрэглэгч үү? Бүртгүүлэх'}</button></div>`);
+ modal(`<span class="eyebrow">LUMI CINEMA</span><h2>${register?'Тавтай морил':'Дахин уулзсандаа таатай байна'}</h2><p class="muted">${register?'Имэйлээ баталгаажуулаад өөрийн кино сантай болоорой.':'Киноны ертөнцдөө нэвтрээрэй.'}</p><form id="auth-form">${register?'<label for="email">Имэйл хаяг</label><input id="email" name="email" type="email" autocomplete="email" maxlength="254" required placeholder="name@gmail.com">':''}<label for="username">${register?'Хэрэглэгчийн нэр':'Имэйл эсвэл хэрэглэгчийн нэр'}</label><input id="username" name="username" autocomplete="username" ${register?'pattern="[a-zA-Z0-9_]{3,30}" minlength="3" maxlength="30"':'maxlength="254"'} required placeholder="${register?'Латин үсэг, тоо, _':'Имэйл эсвэл нэр'}"><label for="password">Нууц үг</label><input id="password" name="password" type="password" minlength="8" maxlength="128" autocomplete="${register?'new-password':'current-password'}" required placeholder="8-аас дээш тэмдэгт"><p class="error" id="auth-error" role="alert"></p><button class="button full">${register?'Баталгаажуулах код авах':'Нэвтрэх'}</button></form><div class="auth-switch"><button class="text-button" id="auth-switch">${register?'Бүртгэлтэй юу? Нэвтрэх':'Шинэ хэрэглэгч үү? Бүртгүүлэх'}</button>${register?'':'<br><button class="text-button" id="forgot-password">Нууц үгээ мартсан уу?</button>'}</div>`);
  $('#auth-switch').onclick=()=>auth(!register);
+ if(!register)$('#forgot-password').onclick=()=>forgotPassword();
  $('#auth-form').onsubmit=async e=>{
   e.preventDefault();const form=e.target,btn=form.querySelector('button');btn.disabled=true;$('#auth-error').textContent='';
   try{
@@ -28,6 +29,110 @@ function auth(register=false){
   }catch(err){if($('#auth-error'))$('#auth-error').textContent=err.message;}finally{btn.disabled=false;}
  };
 }
+function forgotPassword(){
+ modal(`<span class="eyebrow">НУУЦ ҮГ СЭРГЭЭХ</span><h2>Имэйлээ оруулна уу</h2><p class="muted">Бүртгэлтэй Gmail / имэйл хаяг руу 6 оронтой баталгаажуулах код илгээнэ.</p><form id="reset-start-form"><label for="reset-email">Имэйл хаяг</label><input id="reset-email" name="email" type="email" autocomplete="email" maxlength="254" required placeholder="name@gmail.com"><p class="error" id="reset-error" role="alert"></p><button class="button full">Код авах</button></form><div class="auth-switch"><button class="text-button" id="reset-back">Нэвтрэх рүү буцах</button></div>`);
+ $('#reset-back').onclick=()=>auth(false);
+ $('#reset-start-form').onsubmit=async e=>{
+  e.preventDefault();
+  const btn=e.target.querySelector('button');
+  btn.disabled=true;
+  $('#reset-error').textContent='';
+  try{
+   const email=$('#reset-email').value.trim();
+   const challenge=await api('/api/password-reset','POST',{email});
+   if(!challenge.challengeId){
+    $('#reset-error').textContent='Энэ имэйл бүртгэлтэй бол код илгээгдсэн.';
+    btn.disabled=false;
+    return;
+   }
+   resetCodeForm(challenge,email);
+  }catch(err){
+   $('#reset-error').textContent=err.message;
+   btn.disabled=false;
+  }
+ };
+}
+
+function resetCodeForm(challenge,email){
+ modal(`<span class="eyebrow">НУУЦ ҮГ СЭРГЭЭХ</span><h2>Кодоо оруулна уу</h2><p class="muted"><strong>${escape(email)}</strong> хаягт ирсэн 6 оронтой код болон шинэ нууц үгээ оруулна уу.</p><form id="reset-verify-form"><label for="reset-code">Баталгаажуулах код</label><input id="reset-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required placeholder="000000"><label for="reset-password">Шинэ нууц үг</label><input id="reset-password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required placeholder="8-аас дээш тэмдэгт"><label for="reset-password2">Шинэ нууц үгээ давтах</label><input id="reset-password2" type="password" autocomplete="new-password" minlength="8" maxlength="128" required placeholder="Дахин оруулна уу"><p class="error" id="reset-verify-error" role="alert"></p><button class="button full">Нууц үг солих</button></form><p class="fine">Код 10 минут хүчинтэй.</p><button class="text-button" id="reset-resend" disabled>Дахин илгээх</button><br><button class="text-button" id="reset-change-email">Имэйлээ өөрчлөх</button>`);
+
+ const resend=$('#reset-resend');
+ let timer;
+
+ function cooldown(){
+  let seconds=60;
+  clearInterval(timer);
+  resend.disabled=true;
+  resend.textContent=`Дахин илгээх (${seconds} сек)`;
+  timer=setInterval(()=>{
+   if(!resend.isConnected||!$('#modal').open){
+    clearInterval(timer);
+    return;
+   }
+   seconds--;
+   resend.textContent=seconds?`Дахин илгээх (${seconds} сек)`:'Код дахин илгээх';
+   if(!seconds){
+    clearInterval(timer);
+    resend.disabled=false;
+   }
+  },1000);
+ }
+
+ cooldown();
+
+ $('#reset-change-email').onclick=()=>{
+  clearInterval(timer);
+  forgotPassword();
+ };
+
+ resend.onclick=async()=>{
+  resend.disabled=true;
+  $('#reset-verify-error').textContent='';
+  try{
+   challenge=await api('/api/password-reset/resend','POST',{
+    challengeId:challenge.challengeId
+   });
+   cooldown();
+   toast('Шинэ код илгээлээ.');
+  }catch(err){
+   $('#reset-verify-error').textContent=err.message;
+   resend.disabled=false;
+  }
+ };
+
+ $('#reset-verify-form').onsubmit=async e=>{
+  e.preventDefault();
+  const btn=e.target.querySelector('button');
+  btn.disabled=true;
+  $('#reset-verify-error').textContent='';
+
+  const password=$('#reset-password').value;
+  const password2=$('#reset-password2').value;
+
+  if(password!==password2){
+   $('#reset-verify-error').textContent='Нууц үг хоёр ижил байх ёстой.';
+   btn.disabled=false;
+   return;
+  }
+
+  try{
+   await api('/api/password-reset/verify','POST',{
+    challengeId:challenge.challengeId,
+    code:$('#reset-code').value,
+    password
+   });
+   clearInterval(timer);
+   toast('Нууц үг амжилттай солигдлоо.');
+   auth(false);
+  }catch(err){
+   $('#reset-verify-error').textContent=err.message;
+   btn.disabled=false;
+  }
+ };
+
+ $('#reset-code').focus();
+}
+
 function otpForm(challenge){
  modal(`<span class="eyebrow">ИМЭЙЛ БАТАЛГААЖУУЛАХ</span><h2>Имэйлээ шалгаарай</h2><p class="muted"><strong>${escape(challenge.email)}</strong> хаягт илгээсэн 6 оронтой кодыг оруулна уу. Код 10 минут хүчинтэй.</p><form id="otp-form"><label for="otp-code">Баталгаажуулах код</label><input id="otp-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required placeholder="000000"><p class="error" id="otp-error" role="alert"></p><button class="button full">Баталгаажуулж бүртгүүлэх</button></form><p class="fine">Харагдахгүй байвал Spam / Junk хавтсаа шалгаарай.</p><button class="text-button" id="resend-code" disabled>Дахин илгээх</button><br><button class="text-button" id="change-email">Имэйл хаягаа өөрчлөх</button>`);
  const resend=$('#resend-code');let timer;
@@ -41,10 +146,20 @@ function poster(m,i=0){return `<div class="poster tone${i%5}" data-number="${Str
 function card(m,i){return `<a class="card" href="#movie/${m.id}">${poster(m,i)}<h3>${escape(m.title)}</h3><div class="card-bottom"><span class="muted">${escape(m.category)}</span><span class="price">${m.demo?'Жишээ':m.price===0?'Үнэгүй':money(m.price)}</span></div></a>`;}
 function movieList(list){return `<div class="grid">${list.map(card).join('')}</div>`;}
 function empty(title,copy,link='#catalog',label='Кино үзэх'){return `<div class="empty"><h2>${title}</h2><p>${copy}</p><a class="button" href="${link}">${label}</a></div>`;}
-function home(){const list=state.movies.length?state.movies:samples;const m=state.movies.find(x=>x.featured)||state.movies[0];app.innerHTML=`<section class="hero">${m?.poster?`<img class="hero-image" src="${escape(m.poster)}" alt="">`:''}<div class="hero-copy"><span class="eyebrow">${m?'ЭНЭ УДААГИЙН ОНЦЛОХ':'КИНОНЫ БЯЦХАН ЕРТӨНЦ'}</span><h1>${m?escape(m.title):'Түүхэнд нь автаж,<br>мэдрэмжийг нь үлдээ.'}</h1><p>${m?escape(m.description.slice(0,180)):'Хайр, нууц, догдлол. Монгол орчуулгатай кино, богино драмуудаа нэг дороос.'}</p><div class="actions"><a class="button" href="${m?'#movie/'+m.id:'#catalog'}">${m?'▶ Кино үзэх':'Кино сангаар аялах'}</a><a class="button secondary" href="#library">Миний кино</a></div></div>${!m?`<div class="hero-art">${poster(samples[0])}</div>`:''}</section><div class="filters">${categories.map((c,i)=>`<button class="chip ${i===0?'active':''}" data-home-category="${c}">${c}</button>`).join('')}</div><div class="section-head"><h2>Шинээр нэмэгдсэн</h2><a href="#catalog">Бүгдийг үзэх ↗</a></div>${!state.movies.length?'<p class="notice">Кино сан хараахан нээгдээгүй байна. Доорх картууд нь загварын жишээ бөгөөд худалдаалагдахгүй.</p>':''}${movieList(list.slice(0,5))}${state.movies.length>5?`<div class="section-head"><h2>Их үзэлттэй</h2><a href="#catalog">Бүгдийг үзэх ↗</a></div>${movieList([...list].sort((a,b)=>b.views-a.views).slice(0,5))}`:''}`;document.querySelectorAll('[data-home-category]').forEach(b=>b.onclick=()=>{state.category=b.dataset.homeCategory;location.hash='catalog';});}
+function home(){
+ const list=state.movies;
+ const m=state.movies.find(x=>x.featured)||state.movies[0];
+
+ app.innerHTML=`<section class="hero">${m?.poster?`<img class="hero-image" src="${escape(m.poster)}" alt="">`:''}<div class="hero-copy"><span class="eyebrow">${m?'ЭНЭ УДААГИЙН ОНЦЛОХ':'КИНОНЫ БЯЦХАН ЕРТӨНЦ'}</span><h1>${m?escape(m.title):'Түүхэнд нь автаж,<br>мэдрэмжийг нь үлдээ.'}</h1><p>${m?escape(m.description.slice(0,180)):'Хайр, нууц, догдлол. Монгол орчуулгатай кино, богино драмуудаа нэг дороос.'}</p><div class="actions"><a class="button" href="${m?'#movie/'+m.id:'#catalog'}">${m?'▶ Кино үзэх':'Кино сангаар аялах'}</a><a class="button secondary" href="#library">Миний кино</a></div></div></section><div class="filters">${categories.map((c,i)=>`<button class="chip ${i===0?'active':''}" data-home-category="${c}">${c}</button>`).join('')}</div><div class="section-head"><h2>Шинээр нэмэгдсэн</h2><a href="#catalog">Бүгдийг үзэх ↗</a></div>${list.length?movieList(list.slice(0,5)):empty('Кино удахгүй нэмэгдэнэ','Админ хэсгээс анхны киногоо нэмсний дараа энд харагдана.','#catalog','Кино сан харах')}${list.length>5?`<div class="section-head"><h2>Их үзэлттэй</h2><a href="#catalog">Бүгдийг үзэх ↗</a></div>${movieList([...list].sort((a,b)=>b.views-a.views).slice(0,5))}`:''}`;
+
+ document.querySelectorAll('[data-home-category]').forEach(b=>b.onclick=()=>{
+  state.category=b.dataset.homeCategory;
+  location.hash='catalog';
+ });
+}
 function catalog(){app.innerHTML=`<span class="eyebrow">ЧИНИЙ ДАРААГИЙН ДУРТАЙ ТҮҮХ</span><div class="toolbar"><h1 class="title">Кино сан</h1><input id="search" aria-label="Кино хайх" type="search" placeholder="Киноны нэрээр хайх…" value="${escape(state.query)}"></div><div class="filters">${categories.map(c=>`<button class="chip ${state.category===c?'active':''}" data-category="${c}">${c}</button>`).join('')}</div><div id="results"></div>`;$('#search').oninput=e=>{state.query=e.target.value;results();};document.querySelectorAll('[data-category]').forEach(b=>b.onclick=()=>{state.category=b.dataset.category;catalog();});results();}
 function results(){const list=state.movies.filter(m=>(state.category==='Бүгд'||m.category===state.category)&&m.title.toLowerCase().includes(state.query.toLowerCase()));$('#results').innerHTML=list.length?movieList(list):empty('Кино олдсонгүй',state.movies.length?'Өөр нэр эсвэл төрөл сонгоод үзээрэй.':'Шинэ кинонууд удахгүй нэмэгдэнэ.','#home','Нүүр хуудас');}
-async function detail(id){const m=[...state.movies,...samples].find(x=>x.id===id);if(!m){app.innerHTML=empty('Кино олдсонгүй','Кино нийтлэгдээгүй эсвэл хаяг өөрчлөгдсөн байна.');return;}app.innerHTML=`<a href="#catalog" class="back">‹ Кино сан руу буцах</a><section class="detail">${poster(m)}<div><span class="eyebrow">${m.demo?'ЗАГВАРЫН ЖИШЭЭ':'МОНГОЛ ОРЧУУЛГАТАЙ'}</span><h1>${escape(m.title)}</h1><div class="meta"><span class="badge">${escape(m.category)}</span><span>${m.year}</span><span>${escape(m.duration)}</span></div><p>${escape(m.description||'Тайлбар удахгүй нэмэгдэнэ.')}</p>${m.demo?'<div class="notice">Энэ нь худалдаанд байхгүй дизайны жишээ юм.</div>':`<div class="price-large">${m.price===0?'Үнэгүй':money(m.price)}</div><p class="fine">Нэг удаа худалдаж аваад, энэ бүртгэлээрээ үзнэ.</p><button id="movie-action" class="button">${m.owned?'▶ Одоо үзэх':m.price===0?'Нэвтэрч үзэх':'Киноны эрх авах'}</button>`}</div></section>`;if($('#movie-action'))$('#movie-action').onclick=()=>{if(!state.user)return auth();if(m.owned)return location.hash='watch/'+m.id;buy(m);};}
+async function detail(id){const m=state.movies.find(x=>x.id===id);if(!m){app.innerHTML=empty('Кино олдсонгүй','Кино нийтлэгдээгүй эсвэл хаяг өөрчлөгдсөн байна.');return;}app.innerHTML=`<a href="#catalog" class="back">‹ Кино сан руу буцах</a><section class="detail">${poster(m)}<div><span class="eyebrow">${m.demo?'ЗАГВАРЫН ЖИШЭЭ':'МОНГОЛ ОРЧУУЛГАТАЙ'}</span><h1>${escape(m.title)}</h1><div class="meta"><span class="badge">${escape(m.category)}</span><span>${m.year}</span><span>${escape(m.duration)}</span></div><p>${escape(m.description||'Тайлбар удахгүй нэмэгдэнэ.')}</p>${m.demo?'<div class="notice">Энэ нь худалдаанд байхгүй дизайны жишээ юм.</div>':`<div class="price-large">${m.price===0?'Үнэгүй':money(m.price)}</div><p class="fine">Нэг удаа худалдаж аваад, энэ бүртгэлээрээ үзнэ.</p><button id="movie-action" class="button">${m.owned?'▶ Одоо үзэх':m.price===0?'Нэвтэрч үзэх':'Киноны эрх авах'}</button>`}</div></section>`;if($('#movie-action'))$('#movie-action').onclick=()=>{if(!state.user)return auth();if(m.owned)return location.hash='watch/'+m.id;buy(m);};}
 async function buy(m){const s=state.settings;if(!s.account||!s.bank||!s.holder)return toast('Төлбөрийн данс хараахан тохируулаагүй байна.');modal(`<span class="eyebrow">КИНОНЫ ЭРХ АВАХ</span><h2>${escape(m.title)}</h2><div class="bank-row"><span>Төлөх дүн</span><strong class="pink">${money(m.price)}</strong></div><div class="bank-row"><span>Банк</span><strong>${escape(s.bank)}</strong></div><div class="bank-row"><span>Данс / IBAN</span><strong>${escape(s.account)}</strong></div><div class="bank-row"><span>Хүлээн авагч</span><strong>${escape(s.holder)}</strong></div><div class="bank-row"><span>Гүйлгээний утга</span><strong>${state.user.id}</strong></div><p class="notice">Гүйлгээний утгад ID-гаа бичнэ үү. Шилжүүлсний дараа доорх хүсэлтийг илгээнэ. Админ дансанд орсныг шалгаж эрх нээнэ.</p><form id="buy-form"><label for="note">Шилжүүлсэн нэр, цаг эсвэл тайлбар</label><textarea id="note" name="note" maxlength="500" required placeholder="Жишээ: Ганчимэг, 13:45-д шилжүүлсэн"></textarea><p id="buy-error" class="error"></p><button class="button full">Шилжүүлсэн, шалгуулах</button></form>`);$('#buy-form').onsubmit=async e=>{e.preventDefault();e.target.querySelector('button').disabled=true;try{await api('/api/orders','POST',{movieId:m.id,note:$('#note').value});$('#modal').close();location.hash='account';toast('Таны төлбөрийн хүсэлт илгээгдлээ.');}catch(err){$('#buy-error').textContent=err.message;e.target.querySelector('button').disabled=false;}};}
 async function watch(id){try{const data=await api('/api/watch/'+id);app.innerHTML=`<a class="back" href="#movie/${id}">‹ Киноны мэдээлэл</a><h1 class="title">${escape(data.title)}</h1><video class="video" controls controlslist="nodownload" playsinline preload="metadata" src="${data.src}"></video><p class="fine">Видео эхлэхгүй бол интернэт холболтоо шалгаад хуудсаа дахин ачаална уу.</p>`;}catch(e){app.innerHTML=empty('Үзэх эрх шаардлагатай',escape(e.message),'#movie/'+id,'Киноны мэдээлэл');}}
 function signedIn(){if(state.user)return true;app.innerHTML=empty('Өөрийн кино сантай болоорой','Худалдаж авсан кино, төлбөрийн хүсэлтээ харахын тулд нэвтэрнэ үү.','#home','Нүүр хуудас');app.insertAdjacentHTML('beforeend','<p><button class="button" id="sign-in">Нэвтрэх / Бүртгүүлэх</button></p>');$('#sign-in').onclick=()=>auth();return false;}
@@ -55,7 +170,7 @@ function help(){const s=state.settings;app.innerHTML=`<span class="eyebrow">ТУ
 async function adminPage(){if(!signedIn())return;if(state.user.role!=='admin'){app.innerHTML=empty('Админ эрх шаардлагатай','Энэ хэсэгт зөвхөн админ нэвтэрнэ.','#home','Нүүр хуудас');return;}const data=await api('/api/admin/data');state.admin=data;app.innerHTML=`<span class="eyebrow">УДИРДЛАГЫН ХЭСЭГ</span><div class="row"><h1 class="title">Админ самбар</h1><button id="new-movie" class="button">＋ Кино нэмэх</button></div><div class="stats"><div class="stat"><strong>${data.orders.filter(o=>o.status==='pending').length}</strong><span>Хүлээгдэж буй төлбөр</span></div><div class="stat"><strong>${data.movies.length}</strong><span>Нийт кино</span></div><div class="stat"><strong>${money(data.orders.filter(o=>o.status==='approved').reduce((s,o)=>s+o.amount,0))}</strong><span>Баталсан борлуулалт</span></div></div><div class="filters">${[['orders','Төлбөр шалгах'],['movies','Кино удирдах'],['users','Хэрэглэгчид'],['settings','Тохиргоо']].map(([key,title])=>`<button class="chip ${state.adminTab===key?'active':''}" data-tab="${key}">${title}</button>`).join('')}</div><div id="admin-content"></div>`;$('#new-movie').onclick=()=>movieEditor();document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.adminTab=b.dataset.tab;adminPage().catch(e=>toast(e.message));});adminContent();}
 function adminContent(){const d=state.admin,el=$('#admin-content');if(state.adminTab==='orders'){el.innerHTML=d.orders.length?`<div class="table-wrap"><table><thead><tr><th>Хэрэглэгч</th><th>Кино / Гүйлгээ</th><th>Дүн</th><th>Төлөв</th><th>Шалгах</th></tr></thead><tbody>${d.orders.map(o=>`<tr><td>${escape(o.username)}<small>ID: ${o.user_id}</small></td><td>${escape(o.title)}<small>${escape(o.note)}</small><small>${o.created}</small></td><td>${money(o.amount)}</td><td>${status(o.status)}</td><td>${o.status==='pending'?`<button class="button small" data-review="${o.id}" data-status="approved">Батлах</button> <button class="button danger small" data-review="${o.id}" data-status="rejected">Татгалзах</button>`:escape(o.reason||'Шалгасан')}</td></tr>`).join('')}</tbody></table></div>`:empty('Төлбөрийн хүсэлт алга','Шинэ хүсэлтүүд энд харагдана.','#catalog','Кино сан харах');document.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>review(b.dataset.review,b.dataset.status));}
 if(state.adminTab==='movies'){el.innerHTML=d.movies.length?`<div class="table-wrap"><table><thead><tr><th>Кино</th><th>Үнэ</th><th>Төлөв</th><th>Үйлдэл</th></tr></thead><tbody>${d.movies.map(m=>`<tr><td>${escape(m.title)}<small>${escape(m.category)}</small></td><td>${money(m.price)}</td><td>${m.published?'Нийтлэгдсэн':'Ноорог'}</td><td><button class="button secondary small" data-edit="${m.id}">Засах</button></td></tr>`).join('')}</tbody></table></div>`:empty('Анхны киногоо нэмээрэй','Дээрх «Кино нэмэх» товчоор постер, видео, үнэ оруулна.','#home','Сайт харах');document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>movieEditor(d.movies.find(m=>m.id===b.dataset.edit)));}
-if(state.adminTab==='users'){el.innerHTML=`<input id="user-search" type="search" placeholder="ID эсвэл нэрээр хайх" aria-label="Хэрэглэгч хайх"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Нэр</th><th>Эрх</th><th>Бүртгүүлсэн</th></tr></thead><tbody id="users-body"></tbody></table></div>`;const draw=()=>{$('#users-body').innerHTML=d.users.filter(u=>(u.id+' '+u.username).toLowerCase().includes($('#user-search').value.toLowerCase())).map(u=>`<tr><td>${u.id}</td><td>${escape(u.username)}</td><td>${u.role==='admin'?'Админ':'Хэрэглэгч'}</td><td>${u.created}</td></tr>`).join('');};$('#user-search').oninput=draw;draw();}
+if(state.adminTab==='users'){el.innerHTML=`<input id="user-search" type="search" placeholder="ID, нэр эсвэл имэйлээр хайх" aria-label="Хэрэглэгч хайх"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Нэр</th><th>Имэйл</th><th>Эрх</th><th>Бүртгүүлсэн</th></tr></thead><tbody id="users-body"></tbody></table></div>`;const draw=()=>{$('#users-body').innerHTML=d.users.filter(u=>(u.id+' '+u.username+' '+(u.email||'')).toLowerCase().includes($('#user-search').value.toLowerCase())).map(u=>`<tr><td>${u.id}</td><td>${escape(u.username)}</td><td>${escape(u.email||'—')}</td><td>${u.role==='admin'?'Админ':'Хэрэглэгч'}</td><td>${u.created}</td></tr>`).join('');};$('#user-search').oninput=draw;draw();}
 if(state.adminTab==='settings'){el.innerHTML=`<form id="settings-form" class="panel"><h2>Сайт & төлбөрийн данс</h2><div class="form-grid">${[['brand','Сайтын нэр'],['contact','Холбоо барих'],['bank','Банкны нэр'],['account','Данс / IBAN'],['holder','Данс эзэмшигч']].map(([key,label])=>`<div><label for="${key}">${label}</label><input id="${key}" name="${key}" maxlength="150" value="${escape(d.settings[key]||'')}"></div>`).join('')}</div><p class="fine">Дансны мэдээллээ бүрэн хадгалсны дараа төлбөрийн хүсэлт авах боломжтой.</p><p class="error" id="settings-error"></p><button class="button">Хадгалах</button></form>`;$('#settings-form').onsubmit=async e=>{e.preventDefault();try{await api('/api/admin/settings','PUT',Object.fromEntries(new FormData(e.target)));await refresh();toast('Тохиргоо хадгалагдлаа.');}catch(err){$('#settings-error').textContent=err.message;}};}}
 function review(id,status){const o=state.admin.orders.find(o=>o.id===id);modal(`<h2>${status==='approved'?'Төлбөр батлах':'Хүсэлтэд татгалзах'}</h2><p>${escape(o.username)} · ID ${o.user_id}<br>${escape(o.title)} · <strong class="pink">${money(o.amount)}</strong></p><p class="notice">${status==='approved'?'Дансны хуулгаас мөнгө бодитоор орсныг шалгана уу. Баталмагц кино үзэх эрх нээгдэнэ.':'Татгалзсан шалтгаан хэрэглэгчид харагдана.'}</p><form id="review-form">${status==='approved'?'<label><input type="checkbox" required> Дансанд орсныг шалгасан</label>':'<label for="reason">Шалтгаан</label><textarea id="reason" required maxlength="500"></textarea>'}<p class="error" id="review-error"></p><button class="button full">${status==='approved'?'Баталж, эрх нээх':'Татгалзах'}</button></form>`);$('#review-form').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;try{await api('/api/admin/review','POST',{id,status,reason:$('#reason')?.value||''});$('#modal').close();await adminPage();toast('Хүсэлт шинэчлэгдлээ.');}catch(err){$('#review-error').textContent=err.message;b.disabled=false;}};}
 function upload(file,kind,onProgress){return new Promise((resolve,reject)=>{const x=new XMLHttpRequest();x.open('POST','/api/admin/upload');x.setRequestHeader('X-Lumi-Request','1');x.setRequestHeader('Content-Type',file.type|| (kind==='video'?'video/mp4':'image/jpeg'));x.setRequestHeader('X-File-Kind',kind);x.upload.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round(e.loaded/e.total*100));};x.onload=()=>{try{const b=JSON.parse(x.responseText);if(x.status>=200&&x.status<300)resolve(b.id);else reject(Error(b.error||'Файл оруулж чадсангүй.'));}catch{reject(Error('Файл оруулж чадсангүй.'));}};x.onerror=()=>reject(Error('Сүлжээ тасарсан. Дахин оролдоно уу.'));x.send(file);});}
